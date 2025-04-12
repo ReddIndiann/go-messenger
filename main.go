@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/gofiber/fiber/v2/middleware/cors"
+
 	"github.com/ReddIndiann/go-messanger/database"
 	"github.com/ReddIndiann/go-messanger/routes"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {

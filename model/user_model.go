@@ -13,6 +13,14 @@ type User struct {
 	Password  string             `bson:"password,omitempty" json:"-"`
 	Phone     string             `bson:"phone" json:"phone"`
 	Verified  bool               `bson:"verified" json:"verified"`
+	Role      string             `bson:"role" json:"role"`
 	CreatedAt time.Time          `bson:"created_at,omitempty" json:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at,omitempty" json:"updated_at"`
 }
+
+type Role string
+
+const (
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
+)

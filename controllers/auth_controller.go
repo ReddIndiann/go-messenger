@@ -41,10 +41,23 @@ func RegisterUser() fiber.Handler {
 		}
 
 		password, passwordExists := requestData["password"].(string)
+		role, roleExists := requestData["role"].(string)
 
 		if user.Name == "" || user.Email == "" || !passwordExists || password == "" || user.Phone == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "All fields are required",
+			})
+		}
+
+		// Set default role if not provided
+		if !roleExists || role == "" {
+			role = string(model.RoleUser)
+		}
+
+		// Validate role
+		if role != string(model.RoleUser) && role != string(model.RoleAdmin) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid role. Must be either 'user' or 'admin'",
 			})
 		}
 
@@ -74,6 +87,7 @@ func RegisterUser() fiber.Handler {
 			Phone:     user.Phone,
 			Password:  hashedPassword,
 			Verified:  false,
+			Role:      role,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
