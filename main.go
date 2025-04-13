@@ -26,10 +26,12 @@ func main() {
 
 	routes.SetupUserRoutes(app.Group("/auth"))
 	routes.SetupSchoolRoutes(app.Group("/school"))
+	routes.SetupTeacherRoutes(app.Group("/teacher"))
+	routes.SetupStudentRoutes(app.Group("/student"))
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
-
 	}
 	fmt.Println("Server Connected to" + port)
 	app.Listen(":" + port)

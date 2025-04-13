@@ -305,52 +305,13 @@ func UpdateUser() fiber.Handler {
 			})
 		}
 
-		type UpdateRequest struct {
-			FullName string `json:"name"`
-			Phone    string `json:"phone"`
-			Email    string `json:"email"`
-		}
-
-		var request UpdateRequest
-		if err := c.BodyParser(&request); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"status":  "error",
-				"message": "Invalid request body",
-			})
-		}
-
-		update := bson.M{
-			"$set": bson.M{
-				"updated_at": time.Now(),
-			},
-		}
-
-		// Only update fields that are provided
-		if request.FullName != "" {
-			update["$set"].(bson.M)["name"] = request.FullName
-		}
-		if request.Phone != "" {
-			update["$set"].(bson.M)["phone"] = request.Phone
-		}
-		if request.Email != "" {
-			update["$set"].(bson.M)["email"] = request.Email
-		}
-
+		// Get the existing user first
 		collection := database.GetCollection("users")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-		opts.SetProjection(bson.M{"password": 0})
-
-		var updatedUser model.User
-		err = collection.FindOneAndUpdate(
-			ctx,
-			bson.M{"_id": objectID},
-			update,
-			opts,
-		).Decode(&updatedUser)
-
+		var existingUser model.User
+		err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&existingUser)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -360,15 +321,87 @@ func UpdateUser() fiber.Handler {
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"status":  "error",
-				"message": "Error updating user",
-				"error":   err.Error(),
+				"message": "Error fetching user",
 			})
 		}
 
+		// Parse the update request
+		var updateData map[string]interface{}
+		if err := json.Unmarshal(c.Body(), &updateData); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"status":  "error",
+				"message": "Invalid request body",
+			})
+		}
+
+		// Prepare update fields, only including fields that are provided
+		update := bson.M{"$set": bson.M{}}
+		setMap := update["$set"].(bson.M)
+
+		// Helper function to check if a field exists in the update data
+		fieldExists := func(field string) bool {
+			_, exists := updateData[field]
+			return exists
+		}
+
+		// Update only the fields that are provided
+		if fieldExists("name") {
+			setMap["name"] = updateData["name"]
+		}
+		if fieldExists("email") {
+			setMap["email"] = updateData["email"]
+		}
+		if fieldExists("phone") {
+			setMap["phone"] = updateData["phone"]
+		}
+		if fieldExists("role") {
+			setMap["role"] = updateData["role"]
+		}
+		if fieldExists("verified") {
+			setMap["verified"] = updateData["verified"]
+		}
+
+		// Always update the updated_at field
+		setMap["updated_at"] = time.Now()
+
+		// Only perform update if there are fields to update
+		if len(setMap) > 1 { // More than just updated_at
+			opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+			opts.SetProjection(bson.M{"password": 0})
+
+			var updatedUser model.User
+			err = collection.FindOneAndUpdate(
+				ctx,
+				bson.M{"_id": objectID},
+				update,
+				opts,
+			).Decode(&updatedUser)
+
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+						"status":  "error",
+						"message": "User not found",
+					})
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"status":  "error",
+					"message": "Error updating user",
+				})
+			}
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"status":  "success",
+				"message": "User updated successfully",
+				"user":    updatedUser,
+			})
+		}
+
+		// If no fields were updated, return the existing user
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status":  "success",
-			"message": "User updated successfully",
-			"user":    updatedUser,
+			"message": "No fields were updated",
+			"user":    existingUser,
 		})
 	}
 }
