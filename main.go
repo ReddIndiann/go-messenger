@@ -13,24 +13,25 @@ import (
 func main() {
 
 	fmt.Println("Hey World")
-database.Connect()
+	database.Connect()
 
-app := fiber.New(fiber.Config{
-	AppName: "Diary App",
-})
+	app := fiber.New(fiber.Config{
+		AppName: "Diary App",
+	})
 
-app.Use(cors.New(cors.Config{
-	AllowOrigins: "*",
-	AllowMethods: "GET,POST,PUT,DELETE",
-}))
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,DELETE",
+	}))
 
-routes.SetupRoutes(app.Group("/auth"))
-port := os.Getenv("PORT")
-if port ==""{
-port = "3000"
+	routes.SetupUserRoutes(app.Group("/auth"))
+	routes.SetupSchoolRoutes(app.Group("/school"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
 
-}
-fmt.Println("Server Connected to"+ port)
-app.Listen(":" + port)
-fmt.Println("Server Connected to"+ port)
+	}
+	fmt.Println("Server Connected to" + port)
+	app.Listen(":" + port)
+	fmt.Println("Server Connected to" + port)
 }
