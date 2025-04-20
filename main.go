@@ -16,7 +16,7 @@ func main() {
 	database.Connect()
 
 	app := fiber.New(fiber.Config{
-		AppName: "Diary App",
+		AppName: "School App",
 	})
 
 	app.Use(cors.New(cors.Config{
@@ -28,6 +28,7 @@ func main() {
 	routes.SetupSchoolRoutes(app.Group("/school"))
 	routes.SetupTeacherRoutes(app.Group("/teacher"))
 	routes.SetupStudentRoutes(app.Group("/student"))
+	routes.SetupSubjectRoutes(app.Group("/subject"))
 
 	port := os.Getenv("PORT")
 	if port == "" {

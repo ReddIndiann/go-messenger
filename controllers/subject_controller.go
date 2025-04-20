@@ -18,14 +18,42 @@ func RegisterSubject() fiber.Handler {
 		var subject model.SchoolSubject
 		if err := c.BodyParser(&subject); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Invalid request",
+				"error":   "Invalid request format",
+				"details": err.Error(),
 			})
 		}
 
 		// Validate required fields
-		if subject.Name == "" || subject.SchoolID.IsZero() || subject.TeacherID.IsZero() {
+		if subject.Name == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Name, school ID, and teacher ID are required",
+				"error": "Subject name is required",
+			})
+		}
+		if subject.SchoolID.IsZero() {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "School ID is required",
+			})
+		}
+		if subject.TeacherID.IsZero() {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Teacher ID is required",
+			})
+		}
+
+		// Validate optional fields if provided
+		if subject.Grade != "" && (len(subject.Grade) > 2 || !isValidGrade(subject.Grade)) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid grade format. Grade should be a number between 1-12",
+			})
+		}
+		if subject.Section != "" && (len(subject.Section) != 1 || !isValidSection(subject.Section)) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid section format. Section should be a single letter (A-Z)",
+			})
+		}
+		if subject.Status != "" && subject.Status != "Active" && subject.Status != "Inactive" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid status. Status must be either 'Active' or 'Inactive'",
 			})
 		}
 
@@ -33,7 +61,7 @@ func RegisterSubject() fiber.Handler {
 		schoolCollection := database.GetCollection("schools")
 		if err := schoolCollection.FindOne(context.Background(), bson.M{"_id": subject.SchoolID}).Err(); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "School not found",
+				"error": "School not found with the provided ID",
 			})
 		}
 
@@ -41,7 +69,7 @@ func RegisterSubject() fiber.Handler {
 		teacherCollection := database.GetCollection("teachers")
 		if err := teacherCollection.FindOne(context.Background(), bson.M{"_id": subject.TeacherID}).Err(); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Teacher not found",
+				"error": "Teacher not found with the provided ID",
 			})
 		}
 
@@ -67,7 +95,7 @@ func RegisterSubject() fiber.Handler {
 			StudentIDs:  subject.StudentIDs,
 			Grade:       subject.Grade,
 			Section:     subject.Section,
-			Status:      "Active",
+			Status:      "Active", // Default status
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}
@@ -77,7 +105,8 @@ func RegisterSubject() fiber.Handler {
 		result, err := collection.InsertOne(c.Context(), newSubject)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create subject",
+				"error":   "Failed to create subject",
+				"details": err.Error(),
 			})
 		}
 
@@ -88,6 +117,31 @@ func RegisterSubject() fiber.Handler {
 			"info":      newSubject,
 		})
 	}
+}
+
+// Helper function to validate grade
+func isValidGrade(grade string) bool {
+	if len(grade) > 2 {
+		return false
+	}
+	// Check if grade is a number between 1-12
+	num := 0
+	for _, c := range grade {
+		if c < '0' || c > '9' {
+			return false
+		}
+		num = num*10 + int(c-'0')
+	}
+	return num >= 1 && num <= 12
+}
+
+// Helper function to validate section
+func isValidSection(section string) bool {
+	if len(section) != 1 {
+		return false
+	}
+	c := section[0]
+	return c >= 'A' && c <= 'Z'
 }
 
 func GetSubject() fiber.Handler {

@@ -1,1 +1,7 @@
 .env
+*.log
+go-messenger
+tmp/
+.ebextensions/
+*.zip
+.DS_Store
