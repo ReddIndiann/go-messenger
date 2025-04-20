@@ -3,7 +3,7 @@ services:
     name: go-messenger
     env: go
     rootDir: ./
-    buildCommand: go build -o go-messenger
+    buildCommand: GOTOOLCHAIN=local go build -o go-messenger
     startCommand: ./go-messenger
     envVars:
       - key: PORT
