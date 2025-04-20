@@ -13,6 +13,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -168,43 +169,91 @@ func UpdateSchool() fiber.Handler {
 			})
 		}
 
-		var school model.School
-		if err := c.BodyParser(&school); err != nil {
+		// Get the existing school first
+		collection := database.GetCollection("schools")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		var existingSchool model.School
+		err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&existingSchool)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "School not found",
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Error fetching school",
+			})
+		}
+
+		// Parse the update request
+		var updateData map[string]interface{}
+		if err := json.Unmarshal(c.Body(), &updateData); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Invalid request body",
 			})
 		}
 
-		collection := database.GetCollection("schools")
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		// Prepare update fields, only including fields that are provided
+		update := bson.M{"$set": bson.M{}}
+		setMap := update["$set"].(bson.M)
 
-		update := bson.M{
-			"$set": bson.M{
-				"name":       school.Name,
-				"email":      school.Email,
-				"phone":      school.Phone,
-				"logo":       school.Logo,
-				"updated_at": time.Now(),
-			},
+		// Helper function to check if a field exists in the update data
+		fieldExists := func(field string) bool {
+			_, exists := updateData[field]
+			return exists
 		}
 
-		result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+		// Update only the fields that are provided
+		if fieldExists("name") {
+			setMap["name"] = updateData["name"]
+		}
+		if fieldExists("email") {
+			setMap["email"] = updateData["email"]
+		}
+		if fieldExists("phone") {
+			setMap["phone"] = updateData["phone"]
+		}
+		if fieldExists("logo") {
+			setMap["logo"] = updateData["logo"]
+		}
+		if fieldExists("verified") {
+			setMap["verified"] = updateData["verified"]
+		}
+
+		// Always update the updated_at field
+		setMap["updated_at"] = time.Now()
+
+		// Only perform update if there are fields to update
+		if len(setMap) > 1 { // More than just updated_at
+			result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Error updating school",
+				})
+			}
+
+			if result.MatchedCount == 0 {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "School not found",
+				})
+			}
+		}
+
+		// Get the updated school
+		var updatedSchool model.School
+		err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&updatedSchool)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Error updating school",
-			})
-		}
-
-		if result.MatchedCount == 0 {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "School not found",
+				"error": "Error fetching updated school",
 			})
 		}
 
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status":  "success",
 			"message": "School updated successfully",
+			"data":    updatedSchool,
 		})
 	}
 }

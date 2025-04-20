@@ -16,7 +16,7 @@ func main() {
 	database.Connect()
 
 	app := fiber.New(fiber.Config{
-		AppName: "Diary App",
+		AppName: "School App",
 	})
 
 	app.Use(cors.New(cors.Config{
@@ -26,10 +26,13 @@ func main() {
 
 	routes.SetupUserRoutes(app.Group("/auth"))
 	routes.SetupSchoolRoutes(app.Group("/school"))
+	routes.SetupTeacherRoutes(app.Group("/teacher"))
+	routes.SetupStudentRoutes(app.Group("/student"))
+	routes.SetupSubjectRoutes(app.Group("/subject"))
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
-
 	}
 	fmt.Println("Server Connected to" + port)
 	app.Listen(":" + port)
